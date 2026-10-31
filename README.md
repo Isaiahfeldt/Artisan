@@ -13,11 +13,15 @@ Repo Url:
 `https://love.puni.sh/ment.json`
 </div>
 
-## Ingredient marketboard shortcut temporarily disabled
+## Opt-in ingredient marketboard keyboard search
 
-Version **4.0.5.24** disables the fork's new **Search in game marketboard** and Ctrl+left-click marketboard actions following a reported FFXIV crash. Update from the central repository before using this fork again. Existing Artisan functionality, the original Market Board Lookup integration, and name copying remain available.
+Version **4.0.5.25** restores **Search in game marketboard** and Ctrl+left-click using a different submission route. Following the crash report on the previous implementation, this mode is **off by default**. Right-click an ingredient and check **Enable keyboard market search (experimental)** to enable it.
 
-The entire custom native submission path and its framework callback have been removed. The new context-menu entry is disabled with an explanation; Ctrl-click only displays that explanation. The feature will remain disabled pending in-game validation and crash investigation. Request-flow tests cannot validate native UI memory safety.
+The workflow opens a nearby board or uses an already-open one, fills only the text component through its normal API, focuses that component's collision node, waits for shortcut modifiers to be released, and sends Enter to FFXIV's own window using ECommons' keyboard helper. It does not call a custom search signature, write the addon's raw string fields or agent search state, or synthesize a Search-button GUI event.
+
+Before Enter, it requires the game to be in the foreground, the market text field to retain focus, and the marketboard to be the only focused native addon. Loss of focus, dialogs, combat, zone changes, or timeout cancels the request. If the focus checks fail, the filled name is left in place and you can press Enter manually. Existing Shift-click/name-copy behavior is preserved.
+
+First test with the actual marketboard **already open**: opt in through an ingredient's right-click menu, release modifiers after Ctrl+left-clicking its name, and confirm that normal search results appear. Then test opening a nearby board. This implementation is build-checked and has automated request/shortcut checks, but in-game behavior and stability have not been validated in the cloud.
 
 Custom repository URL:
 

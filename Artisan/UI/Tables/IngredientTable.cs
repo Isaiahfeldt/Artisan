@@ -748,6 +748,12 @@ namespace Artisan.UI.Tables
 
         private static void DrawInGameMarketboardSearch(Ingredient item)
         {
+            var enabled = P.Config.EnableKeyboardMarketSearch;
+            if (ImGui.Checkbox("Enable keyboard market search (experimental)", ref enabled))
+            {
+                P.Config.EnableKeyboardMarketSearch = enabled;
+                P.Config.Save();
+            }
             var reason = IngredientMarketboardSearch.UnavailableReason(item.Data);
             if (reason != null)
             {

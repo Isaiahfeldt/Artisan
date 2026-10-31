@@ -1,16 +1,120 @@
 using Artisan.Tasks;
 
-var checks = new (bool Ctrl, bool Shift, bool Alt, IngredientClickAction Expected)[]
+var passed = 0;
+void Check(string name, Action test)
 {
-    (true, false, false, IngredientClickAction.MarketboardSearch),
-    (false, true, false, IngredientClickAction.CopyName),
-    (true, true, false, IngredientClickAction.CopyName),
-    (false, false, false, IngredientClickAction.CopyName),
-    (true, false, true, IngredientClickAction.CopyName),
-};
-foreach (var c in checks)
-{
-    if (IngredientClick.Resolve(c.Ctrl, c.Shift, c.Alt) != c.Expected)
-        throw new Exception("Unexpected shortcut mapping");
+    test(); passed++; Console.WriteLine($"PASS {name}");
 }
-Console.WriteLine($"{checks.Length} shortcut checks passed. Marketboard action is disabled in the plugin.");
+void Expect(MarketboardSearchStep actual, MarketboardSearchStep expected)
+{
+    if (actual != expected) throw new Exception($"Expected {expected}, received {actual}");
+}
+void True(bool value) { if (!value) throw new Exception("Assertion failed"); }
+MarketboardSearchRequest Start() { var r = new MarketboardSearchRequest(); r.Start(0); return r; }
+Check("Idle request takes no action", () => Expect(new MarketboardSearchRequest().Next(0, true, false, true, true), MarketboardSearchStep.Idle));
+Check("Open marketboard searches once without retargeting", () =>
+{
+    var r = Start(); Expect(r.Next(1, true, true, false, false), MarketboardSearchStep.FillSearch);
+    Expect(r.Next(2, true, true, false, false), MarketboardSearchStep.Wait);
+    Expect(r.Next(101, true, true, false, false), MarketboardSearchStep.SubmitSearch);
+    r.SearchSubmitted();
+    Expect(r.Next(102, true, true, false, false), MarketboardSearchStep.Idle);
+});
+Check("Select before interacting with a nearby board", () =>
+{
+    var r = Start(); Expect(r.Next(1, true, false, true, true), MarketboardSearchStep.SelectBoard);
+    Expect(r.Next(2, true, false, true, true), MarketboardSearchStep.InteractWithBoard);
+});
+Check("Board interaction is throttled and retried", () =>
+{
+    var r = Start(); r.Next(1, true, false, true, true); r.Next(2, true, false, true, true);
+    Expect(r.Next(2501, true, false, true, true), MarketboardSearchStep.Wait);
+    Expect(r.Next(2502, true, false, true, true), MarketboardSearchStep.SelectBoard);
+    Expect(r.Next(2503, true, false, true, true), MarketboardSearchStep.InteractWithBoard);
+});
+Check("Opening only succeeds after the search window is ready", () =>
+{
+    var r = Start(); r.Next(1, true, false, true, true); r.Next(2, true, false, true, true);
+    True(r.Pending); Expect(r.Next(3, true, true, false, false), MarketboardSearchStep.FillSearch);
+    Expect(r.Next(103, true, true, false, false), MarketboardSearchStep.SubmitSearch);
+    r.SearchSubmitted(); True(!r.Pending);
+});
+Check("Opening times out and cannot search afterward", () =>
+{
+    var r = Start(); Expect(r.Next(10000, true, false, false, false), MarketboardSearchStep.TimedOut);
+    Expect(r.Next(10001, true, true, false, false), MarketboardSearchStep.Idle);
+});
+Check("Context change cancels before search even if a window is ready", () =>
+{
+    var r = Start(); Expect(r.Next(1, false, true, true, true), MarketboardSearchStep.Cancelled); True(!r.Pending);
+});
+Check("Unrelated occupied interactions are not interrupted", () =>
+{
+    var r = Start(); Expect(r.Next(1, true, false, true, false), MarketboardSearchStep.Wait);
+});
+Check("A disappearing board waits rather than issuing an interaction", () =>
+{
+    var r = Start(); r.Next(1, true, false, true, true);
+    Expect(r.Next(2, true, false, false, true), MarketboardSearchStep.Wait);
+});
+Check("Plugin disposal cancels a pending request", () =>
+{
+    var r = Start(); r.Cancel(); Expect(r.Next(1, true, true, true, true), MarketboardSearchStep.Idle);
+});
+Check("Localized board names ignore display capitalization", () =>
+{
+    True(MarketboardObject.Matches(0, "Market Board", "market board"));
+    True(MarketboardObject.Matches(0, "TABLEAU DES VENTES", "tableau des ventes"));
+});
+Check("Known board object IDs work independently of language", () =>
+{
+    foreach (var id in new uint[] { 2000073, 2000402, 2000440, 2000442, 2010285 })
+        True(MarketboardObject.Matches(id, "", ""));
+});
+Check("Non-marketboard objects are rejected", () =>
+{
+    True(!MarketboardObject.Matches(2000401, "Summoning Bell", "market board"));
+    True(!MarketboardObject.Matches(0, "", ""));
+});
+Check("Submission stays pending until Enter has been sent", () =>
+{
+    var r = Start(); r.Next(1, true, true, false, false);
+    Expect(r.Next(101, true, true, false, false), MarketboardSearchStep.SubmitSearch);
+    True(r.Pending);
+    Expect(r.Next(102, true, true, false, false), MarketboardSearchStep.SubmitSearch);
+    r.SearchSubmitted(); True(!r.Pending);
+});
+Check("Closing the window after text entry cancels pending submission", () =>
+{
+    var r = Start(); r.Next(1, true, true, false, false);
+    Expect(r.Next(101, true, false, true, true), MarketboardSearchStep.Cancelled);
+});
+Check("Ctrl-click selects marketboard search", () =>
+{
+    True(IngredientClick.Resolve(true, false, false) == IngredientClickAction.MarketboardSearch);
+});
+Check("Shift and Ctrl+Shift clicks retain copying", () =>
+{
+    True(IngredientClick.Resolve(false, true, false) == IngredientClickAction.CopyName);
+    True(IngredientClick.Resolve(true, true, false) == IngredientClickAction.CopyName);
+});
+Check("Normal and Alt-modified clicks retain existing copying behavior", () =>
+{
+    True(IngredientClick.Resolve(false, false, false) == IngredientClickAction.CopyName);
+    True(IngredientClick.Resolve(true, false, true) == IngredientClickAction.CopyName);
+});
+Check("Enter waits until shortcut modifiers have been released", () =>
+{
+    var r = Start(); r.Next(1, true, true, false, false);
+    Expect(r.Next(101, true, true, false, false, false), MarketboardSearchStep.Wait);
+    Expect(r.Next(501, true, true, false, false, false), MarketboardSearchStep.Wait);
+    Expect(r.Next(502, true, true, false, false, true), MarketboardSearchStep.SubmitSearch);
+    r.SearchSubmitted();
+    Expect(r.Next(503, true, true, false, false), MarketboardSearchStep.Idle);
+});
+Check("Lost game focus cancels instead of sending Enter", () =>
+{
+    var r = Start(); r.Next(1, true, true, false, false);
+    Expect(r.Next(101, false, true, false, false), MarketboardSearchStep.Cancelled);
+});
+Console.WriteLine($"{passed} keyboard-market request and shortcut checks passed.");

@@ -107,6 +107,7 @@ public unsafe class Artisan : IDalamudPlugin
         Endurance.Init();
         IPC.IPC.Init();
         RetainerInfo.Init();
+        IngredientMarketboardSearch.Init();
         CraftingListContextMenu.Init();
         UniversalsisClient = new();
 
@@ -277,6 +278,7 @@ public unsafe class Artisan : IDalamudPlugin
         Svc.ClientState.Logout -= OnLogout;
         Svc.ClientState.Login -= OnLogin;
         Endurance.Dispose();
+        IngredientMarketboardSearch.Dispose();
         RetainerInfo.Dispose();
         IPC.IPC.Dispose();
 
