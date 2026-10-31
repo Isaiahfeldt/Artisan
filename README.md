@@ -13,30 +13,22 @@ Repo Url:
 `https://love.puni.sh/ment.json`
 </div>
 
-## Fork feature: ingredient search in the game marketboard
+## Ingredient marketboard shortcut temporarily disabled
 
-This fork adds **Search in game marketboard** to the List Editor's Ingredients-panel right-click menu. It is separate from **Market Board Lookup**, which still uses the MarketBoard plugin's `/pmb` command.
+Version **4.0.5.24** disables the fork's new **Search in game marketboard** and Ctrl+left-click marketboard actions following a reported FFXIV crash. Update from the central repository before using this fork again. Existing Artisan functionality, the original Market Board Lookup integration, and name copying remain available.
 
-Open the actual marketboard first, or stand within interaction range of a board. Right-click an ingredient and choose **Search in game marketboard**. Artisan selects and opens a nearby board when needed, waits for the game search window, fills the ingredient's localized name, then activates the actual Search button after the input has updated. Choose the item/listing and purchase through the normal game UI.
+The entire custom native submission path and its framework callback have been removed. The new context-menu entry is disabled with an explanation; Ctrl-click only displays that explanation. The feature will remain disabled pending in-game validation and crash investigation. Request-flow tests cannot validate native UI memory safety.
 
-The option is disabled with a tooltip for unmarketable items, when no board is reachable/open, while Artisan is busy crafting/restocking, or while an existing listing or confirmation dialog needs to be closed. Pending opening requests time out after 10 seconds and cancel on logout, territory change, combat, or conflicting activity. There is no walking, teleporting, or automatic purchasing.
-
-The search uses the actual localized Search button and its registered click event rather than a separate native search signature. The request stays pending while the button loads/enables and times out rather than reporting success merely because text was filled. In-game verification of search submission is still needed.
-
-Install the fork from this central Dalamud repository (replace the original Artisan installation; do not load two copies):
+Custom repository URL:
 
 ```text
 https://raw.githubusercontent.com/Isaiahfeldt/ffxiv/main/pluginmaster.json
 ```
 
-Build with .NET 10, initialize the PunishLib, OtterGui, KamiToolKit, and AutoRetainerAPI submodules, and point `DalamudLibPath` at stable Dalamud assemblies. For Linux build validation:
+Build with .NET 10 and initialized C# submodules, using stable Dalamud assemblies:
 
 ```sh
 dotnet restore Artisan/Artisan.csproj -p:Configuration=Release -p:Platform=x64 -p:EnableWindowsTargeting=true -p:DalamudLibPath="$DALAMUD_HOME/"
 dotnet build Artisan/Artisan.csproj --no-restore -c Release -m:1 -p:Platform=x64 -p:EnableWindowsTargeting=true -p:DalamudLibPath="$DALAMUD_HOME/"
 dotnet run --project Artisan.Checks
 ```
-
-The existing tracked `raphael-cli.bin` supplies the solver for this package; the Rust submodule need not be rebuilt for this UI change.
-
-Version 4.0.5.23 adds **Ctrl+left-click** on ingredient names as a shortcut for the same action. Shift+left-click and Ctrl+Shift+left-click retain copying; ordinary clicks retain their previous behavior. Both the shortcut and the right-click option share the same search workflow.

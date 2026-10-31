@@ -6,6 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../Artisan/Tasks/MarketboardSearchRequest.cs" Link="MarketboardSearchRequest.cs" />
+    <Compile Include="../Artisan/Tasks/IngredientClick.cs" Link="IngredientClick.cs" />
   </ItemGroup>
 </Project>

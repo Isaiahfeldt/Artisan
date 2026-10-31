@@ -11,5 +11,5 @@
   ],
   "RepoUrl": "https://github.com/Isaiahfeldt/Artisan",
   "DalamudApiLevel": 15,
-  "ChangeLog": "Fixed ingredient marketboard search submission by clicking the game Search button after text entry. Added Ctrl+left-click on ingredient names; Shift-click still copies names."
+  "ChangeLog": "Disabled the new in-game ingredient marketboard search and Ctrl-click action following a reported game crash. Removed all custom native search/GUI-event dispatch and update hooks. Existing Artisan features and name copying remain available."
 }
