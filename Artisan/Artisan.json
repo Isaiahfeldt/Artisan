@@ -11,5 +11,5 @@
   ],
   "RepoUrl": "https://github.com/Isaiahfeldt/Artisan",
   "DalamudApiLevel": 15,
-  "ChangeLog": "Added ingredient right-click search in the actual in-game marketboard, using an open board or a nearby board."
+  "ChangeLog": "Fixed ingredient marketboard search submission by clicking the game Search button after text entry. Added Ctrl+left-click on ingredient names; Shift-click still copies names."
 }

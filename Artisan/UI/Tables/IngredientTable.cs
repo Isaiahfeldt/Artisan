@@ -203,8 +203,14 @@ namespace Artisan.UI.Tables
 
                 if (selected)
                 {
-                    ImGui.SetClipboardText(item.Data.Name.ToString());
-                    Notify.Success("Name copied to clipboard");
+                    var io = ImGui.GetIO();
+                    if (IngredientClick.Resolve(io.KeyCtrl, io.KeyShift, io.KeyAlt) == IngredientClickAction.MarketboardSearch)
+                        IngredientMarketboardSearch.Start(item.Data);
+                    else
+                    {
+                        ImGui.SetClipboardText(item.Data.Name.ToString());
+                        Notify.Success("Name copied to clipboard");
+                    }
                 }
 
                 if (ImGui.IsItemHovered())
@@ -218,6 +224,7 @@ namespace Artisan.UI.Tables
                         sb.Append($"{usedin.NameOfRecipe()} - {amountUsed}\r\n");
                     }
                     ImGui.BeginTooltip();
+                    ImGui.TextUnformatted("Ctrl+left-click: search in game marketboard. Shift+left-click: copy name.");
                     ImGui.Text($"Used in:\r\n{sb}");
                     ImGui.EndTooltip();
                 }

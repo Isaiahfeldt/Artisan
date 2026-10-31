@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using Artisan.CraftingLists;
 using Artisan.IPC;
 using Dalamud.Game.ClientState.Conditions;
@@ -10,6 +9,7 @@ using ECommons.DalamudServices;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using EObjName = Lumina.Excel.Sheets.EObjName;
 using Item = Lumina.Excel.Sheets.Item;
@@ -20,14 +20,6 @@ namespace Artisan.Tasks;
 
 internal static unsafe class IngredientMarketboardSearch
 {
-    // Upstream FFXIVClientStructs AddonItemSearch.RunSearch(bool ignoreFilters).
-    // https://github.com/aers/FFXIVClientStructs/blob/main/FFXIVClientStructs/FFXIV/Client/UI/AddonItemSearch.cs
-    // Bound locally because Artisan's current structs do not expose this member yet.
-    private const string SearchSignature = "E8 ?? ?? ?? ?? 48 8D AC 24";
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void RunSearchDelegate(AddonItemSearch* addon, [MarshalAs(UnmanagedType.I1)] bool ignoreFilters);
-
-    private static RunSearchDelegate? runSearch;
     private static readonly MarketboardSearchRequest Request = new();
     private static string searchName = string.Empty;
     private static uint territory;
@@ -38,14 +30,6 @@ internal static unsafe class IngredientMarketboardSearch
     {
         if (initialized) return;
         initialized = true;
-        try
-        {
-            if (Svc.SigScanner.TryScanText(SearchSignature, out var address))
-                runSearch = Marshal.GetDelegateForFunctionPointer<RunSearchDelegate>(address);
-            else
-                Svc.Log.Warning("Ingredient marketboard search is unavailable: native search signature not found.");
-        }
-        catch (Exception ex) { Svc.Log.Error(ex, "Could not initialize ingredient marketboard search"); }
         Svc.Framework.Update += Update;
     }
 
@@ -54,14 +38,12 @@ internal static unsafe class IngredientMarketboardSearch
         Request.Cancel();
         if (initialized) Svc.Framework.Update -= Update;
         initialized = false;
-        runSearch = null;
     }
 
     internal static string? UnavailableReason(Item item)
     {
         if (item.RowId == 0 || item.IsUntradable || item.ItemSearchCategory.RowId == 0)
             return "This item cannot be sold on the marketboard.";
-        if (runSearch == null) return "In-game market search is unavailable for this game version.";
         if (Request.Pending) return "An in-game marketboard search is already opening.";
         var player = Svc.Objects.LocalPlayer;
         if (player == null || player.CurrentHp == 0 || Svc.ClientState.IsPvP
@@ -109,6 +91,36 @@ internal static unsafe class IngredientMarketboardSearch
             .OrderBy(obj => Vector3.DistanceSquared(player.Position, obj.Position)).FirstOrDefault();
     }
 
+    private static bool ClickSearchButton(AtkUnitBase* addon)
+    {
+        // Resolve the real button by its localized market-search label, rather than
+        // assuming a node ID or bypassing the UI's input/submit event handling.
+        var label = Svc.Data.GetExcelSheet<Lumina.Excel.Sheets.Addon>().GetRow(1942).Text.GetText().Trim();
+        for (var index = 0; index < addon->UldManager.NodeListCount; index++)
+        {
+            var node = addon->UldManager.NodeList[index];
+            if (node == null || (int)node->Type < 1000 || !node->IsVisible()) continue;
+            var component = ((AtkComponentNode*)node)->Component;
+            if (component == null || component->GetComponentType() != ComponentType.Button) continue;
+            var button = (AtkComponentButton*)component;
+            if (button->ButtonTextNode == null || !button->IsEnabled
+                || !button->ButtonTextNode->NodeText.GetText().Trim().Equals(label, StringComparison.OrdinalIgnoreCase)) continue;
+            // Dispatch the button's own registered click event and parameter.
+            AtkEvent* click = null;
+            for (var evt = (AtkEvent*)node->AtkEventManager.Event; evt != null; evt = evt->NextEvent)
+            {
+                if (evt->State.EventType == AtkEventType.ButtonClick) { click = evt; break; }
+                if (click == null && evt->State.EventType == AtkEventType.MouseClick) click = evt;
+            }
+            if (click != null)
+            {
+                addon->ReceiveEvent(click->State.EventType, (int)click->Param, click);
+                return true;
+            }
+        }
+        return false; // Wait for the button to finish loading/enabling, until timeout.
+    }
+
     private static void Update(IFramework framework)
     {
         if (!Request.Pending) return;
@@ -134,20 +146,27 @@ internal static unsafe class IngredientMarketboardSearch
                         else TargetSystem.Instance()->InteractWithObject((GameObject*)board.Address, false);
                     }
                     break;
-                case MarketboardSearchStep.Search:
-                    if (runSearch != null && GenericHelpers.TryGetAddonByName<AddonItemSearch>("ItemSearch", out var addon))
+                case MarketboardSearchStep.FillSearch:
+                    if (GenericHelpers.TryGetAddonByName<AddonItemSearch>("ItemSearch", out var addon))
                     {
                         addon->SearchTextInput->SetText(searchName);
                         addon->SearchText.SetString(searchName);
                         addon->SearchText2.SetString(searchName);
-                        runSearch(addon, true); // Native search, ignoring stale category filters.
+                        var agent = AgentItemSearch.Instance();
+                        if (agent != null && agent->StringData != null)
+                            agent->StringData->SearchParam.SetString(searchName);
                     }
+                    break;
+                case MarketboardSearchStep.SubmitSearch:
+                    if (GenericHelpers.TryGetAddonByName<AddonItemSearch>("ItemSearch", out var searchAddon)
+                        && ClickSearchButton(&searchAddon->AtkUnitBase))
+                        Request.SearchSubmitted();
                     break;
                 case MarketboardSearchStep.Cancelled:
                     Svc.Chat.PrintError("[Artisan] Marketboard search cancelled because the character or game interaction changed.");
                     break;
                 case MarketboardSearchStep.TimedOut:
-                    Svc.Chat.PrintError("[Artisan] Marketboard did not open in time. Move closer or open it manually, then try again.");
+                    Svc.Chat.PrintError("[Artisan] Marketboard search could not be submitted in time. Open the board manually and try again.");
                     break;
             }
         }
