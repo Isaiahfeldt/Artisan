@@ -9,6 +9,7 @@ using Artisan.IPC;
 using Artisan.RawInformation;
 using Artisan.RawInformation.Character;
 using Artisan.UI;
+using Artisan.Tasks;
 using Artisan.UI.KTK;
 using Artisan.Universalis;
 using AutoRetainerAPI;
@@ -106,6 +107,7 @@ public unsafe class Artisan : IDalamudPlugin
         Endurance.Init();
         IPC.IPC.Init();
         RetainerInfo.Init();
+        IngredientMarketboardSearch.Init();
         CraftingListContextMenu.Init();
         UniversalsisClient = new();
 
@@ -276,6 +278,7 @@ public unsafe class Artisan : IDalamudPlugin
         Svc.ClientState.Logout -= OnLogout;
         Svc.ClientState.Login -= OnLogin;
         Endurance.Dispose();
+        IngredientMarketboardSearch.Dispose();
         RetainerInfo.Dispose();
         IPC.IPC.Dispose();
 

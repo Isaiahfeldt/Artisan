@@ -9,8 +9,7 @@
   "Tags": [
     "crafting"
   ],
-  "RepoUrl": "https://github.com/PunishXIV/Artisan",
+  "RepoUrl": "https://github.com/Isaiahfeldt/Artisan",
   "DalamudApiLevel": 15,
-  "DownloadLinkTesting": "https://love.puni.sh/plugins/Artisan/Testing/latest.zip",
-  "ChangeLog": "- Allow copy of premade lists into user lists.\n- Fix export of premade lists."
+  "ChangeLog": "Added ingredient right-click search in the actual in-game marketboard, using an open board or a nearby board."
 }

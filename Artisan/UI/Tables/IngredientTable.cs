@@ -1,6 +1,7 @@
 ﻿using Artisan.CraftingLists;
 using Artisan.IPC;
 using Artisan.RawInformation;
+using Artisan.Tasks;
 using Dalamud.Interface.Colors;
 using ECommons;
 using ECommons.Automation;
@@ -731,10 +732,24 @@ namespace Artisan.UI.Tables
             DrawSearchItem(item);
             DrawItemVendorLookup(item);
             DrawMonsterLootLookup(item);
+            DrawInGameMarketboardSearch(item);
             DrawMarketBoardLookup(item);
             DrawFilterOnCrafts(item);
             DrawRestockFromRetainer(item);
             //DrawCraftThisItem(item);
+        }
+
+        private static void DrawInGameMarketboardSearch(Ingredient item)
+        {
+            var reason = IngredientMarketboardSearch.UnavailableReason(item.Data);
+            if (reason != null)
+            {
+                ImGui.TextDisabled("Search in game marketboard");
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip(reason);
+                return;
+            }
+            if (ImGui.Selectable("Search in game marketboard"))
+                IngredientMarketboardSearch.Start(item.Data);
         }
 
         private void DrawMarketBoardLookup(Ingredient item)
