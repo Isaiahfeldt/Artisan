@@ -13,15 +13,11 @@ Repo Url:
 `https://love.puni.sh/ment.json`
 </div>
 
-## Opt-in ingredient marketboard keyboard search
+## Ingredient marketboard shortcut
 
-Version **4.0.5.25** restores **Search in game marketboard** and Ctrl+left-click using a different submission route. Following the crash report on the previous implementation, this mode is **off by default**. Right-click an ingredient and check **Enable keyboard market search (experimental)** to enable it.
+Version **4.0.5.26** removes the toggle. **Ctrl+left-click** an ingredient name, or right-click it and choose **Search in game marketboard**, to open a nearby marketboard (or use an already-open one) and fill the ingredient name. **Press Enter or click Search yourself.** There is no automatic keypress, custom Search-button event dispatch, or direct search-state write.
 
-The workflow opens a nearby board or uses an already-open one, fills only the text component through its normal API, focuses that component's collision node, waits for shortcut modifiers to be released, and sends Enter to FFXIV's own window using ECommons' keyboard helper. It does not call a custom search signature, write the addon's raw string fields or agent search state, or synthesize a Search-button GUI event.
-
-Before Enter, it requires the game to be in the foreground, the market text field to retain focus, and the marketboard to be the only focused native addon. Loss of focus, dialogs, combat, zone changes, or timeout cancels the request. If the focus checks fail, the filled name is left in place and you can press Enter manually. Existing Shift-click/name-copy behavior is preserved.
-
-First test with the actual marketboard **already open**: opt in through an ingredient's right-click menu, release modifiers after Ctrl+left-clicking its name, and confirm that normal search results appear. Then test opening a nearby board. This implementation is build-checked and has automated request/shortcut checks, but in-game behavior and stability have not been validated in the cloud.
+Shift-click and Ctrl+Shift-click retain name copying. When the shortcut is unavailable, hover the context-menu entry for the reason. Build and 16 request/shortcut checks pass; the simpler open-and-fill behavior follows the portion previously confirmed working in-game.
 
 Custom repository URL:
 
@@ -29,7 +25,7 @@ Custom repository URL:
 https://raw.githubusercontent.com/Isaiahfeldt/ffxiv/main/pluginmaster.json
 ```
 
-Build with .NET 10 and initialized C# submodules, using stable Dalamud assemblies:
+Build with .NET 10, initialized C# submodules, and stable Dalamud assemblies:
 
 ```sh
 dotnet restore Artisan/Artisan.csproj -p:Configuration=Release -p:Platform=x64 -p:EnableWindowsTargeting=true -p:DalamudLibPath="$DALAMUD_HOME/"

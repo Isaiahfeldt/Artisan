@@ -18,7 +18,6 @@ namespace Artisan
     public class Configuration : IPluginConfiguration
     {
         public int Version { get; set; } = 2;
-        public bool EnableKeyboardMarketSearch { get; set; } = false;
         public bool AutoMode
         {
             get => autoMode;

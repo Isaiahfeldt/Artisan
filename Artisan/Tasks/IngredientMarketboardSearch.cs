@@ -2,8 +2,6 @@ using System;
 using System.Linq;
 using System.Numerics;
 using ECommons.Interop;
-using ECommons.Automation;
-using Dalamud.Game.ClientState.Keys;
 using Dalamud.Bindings.ImGui;
 using Artisan.CraftingLists;
 using Artisan.IPC;
@@ -47,7 +45,6 @@ internal static unsafe class IngredientMarketboardSearch
     {
         if (item.RowId == 0 || item.IsUntradable || item.ItemSearchCategory.RowId == 0)
             return "This item cannot be sold on the marketboard.";
-        if (!P.Config.EnableKeyboardMarketSearch) return "Enable keyboard market search in this ingredient menu first (experimental).";
         if (Request.Pending) return "An in-game marketboard search is already opening.";
         var player = Svc.Objects.LocalPlayer;
         if (player == null || player.CurrentHp == 0 || Svc.ClientState.IsPvP
@@ -97,11 +94,6 @@ internal static unsafe class IngredientMarketboardSearch
             .OrderBy(obj => Vector3.DistanceSquared(player.Position, obj.Position)).FirstOrDefault();
     }
 
-    private static bool ModifiersHeld() => Svc.KeyState[VirtualKey.CONTROL]
-        || Svc.KeyState[VirtualKey.LCONTROL] || Svc.KeyState[VirtualKey.RCONTROL]
-        || Svc.KeyState[VirtualKey.SHIFT] || Svc.KeyState[VirtualKey.LSHIFT] || Svc.KeyState[VirtualKey.RSHIFT]
-        || Svc.KeyState[VirtualKey.MENU] || Svc.KeyState[VirtualKey.LMENU] || Svc.KeyState[VirtualKey.RMENU];
-
     private static AtkResNode* InputCollisionNode(AddonItemSearch* addon)
     {
         var input = addon->SearchTextInput;
@@ -115,19 +107,6 @@ internal static unsafe class IngredientMarketboardSearch
         return null;
     }
 
-    private static bool FocusedMarketInput()
-    {
-        if (!WindowFunctions.ApplicationIsActivated() || ModifiersHeld()
-            || !GenericHelpers.TryGetAddonByName<AddonItemSearch>("ItemSearch", out var addon)) return false;
-        var inputNode = InputCollisionNode(addon);
-        if (inputNode == null || addon->FocusNode != inputNode) return false;
-        // Refuse to send Enter when another native window (including chat/dialogs)
-        // shares focus. This is deliberately stricter than just checking visibility.
-        var manager = RaptureAtkUnitManager.Instance();
-        return manager != null && manager->FocusedUnitsList.Count == 1
-            && manager->FocusedUnitsList.Entries[0].Value == &addon->AtkUnitBase;
-    }
-
     private static void Update(IFramework framework)
     {
         if (!Request.Pending) return;
@@ -138,11 +117,11 @@ internal static unsafe class IngredientMarketboardSearch
                 && !Svc.Condition[ConditionFlag.BetweenAreas] && !Svc.Condition[ConditionFlag.BetweenAreas51]
                 && !Svc.Condition[ConditionFlag.Crafting] && !Svc.Condition[ConditionFlag.WatchingCutscene]
                 && !Svc.Condition[ConditionFlag.WatchingCutscene78] && !Visible("SelectYesno") && !Visible("ItemSearchResult")
-                && P.Config.EnableKeyboardMarketSearch && WindowFunctions.ApplicationIsActivated()
+                && WindowFunctions.ApplicationIsActivated()
                 && !P.TM.IsBusy && !P.CTM.IsBusy && !RetainerInfo.TM.IsBusy && !CraftingListUI.Processing;
             var ready = SearchReady();
             var board = ready ? null : FindBoard();
-            switch (Request.Next(Environment.TickCount64, valid, ready, board != null, !GenericHelpers.IsOccupied(), !ModifiersHeld()))
+            switch (Request.Next(Environment.TickCount64, valid, ready, board != null, !GenericHelpers.IsOccupied()))
             {
                 case MarketboardSearchStep.SelectBoard:
                     Svc.Targets.Target = board;
@@ -160,27 +139,14 @@ internal static unsafe class IngredientMarketboardSearch
                         // Use only the text component API: no Utf8String field or agent writes.
                         addon->SearchTextInput->SetText(searchName);
                         var inputNode = InputCollisionNode(addon);
-                        if (inputNode == null || !addon->SetFocusNode(inputNode))
-                        {
-                            Request.Cancel();
-                            Svc.Chat.PrintError("[Artisan] Could not focus marketboard search. Please press Enter manually.");
-                        }
+                        if (inputNode != null) addon->SetFocusNode(inputNode);
                     }
-                    break;
-                case MarketboardSearchStep.SubmitSearch:
-                    if (!FocusedMarketInput())
-                    {
-                        Request.Cancel();
-                        Svc.Chat.PrintError("[Artisan] Search focus changed; Enter was not sent.");
-                    }
-                    else if (WindowsKeypress.SendKeypress((int)VirtualKey.RETURN))
-                        Request.SearchSubmitted();
                     break;
                 case MarketboardSearchStep.Cancelled:
                     Svc.Chat.PrintError("[Artisan] Marketboard search cancelled because the character or game interaction changed.");
                     break;
                 case MarketboardSearchStep.TimedOut:
-                    Svc.Chat.PrintError("[Artisan] Keyboard market search timed out. Open the board and try again, or press Enter manually.");
+                    Svc.Chat.PrintError("[Artisan] Marketboard did not open in time. Move closer or open it manually and try again.");
                     break;
             }
         }
