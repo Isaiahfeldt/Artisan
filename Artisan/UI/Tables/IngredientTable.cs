@@ -1,4 +1,5 @@
-﻿using Artisan.CraftingLists;
+﻿using Dalamud.Bindings.ImGui;
+using Artisan.CraftingLists;
 using Artisan.IPC;
 using Artisan.RawInformation;
 using Artisan.Tasks;
@@ -10,7 +11,6 @@ using ECommons.ImGuiMethods;
 using ECommons.Reflection;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
-using Dalamud.Bindings.ImGui;
 using Lumina.Excel.Sheets;
 using OtterGui;
 using OtterGui.Raii;
@@ -39,7 +39,7 @@ namespace Artisan.UI.Tables
         private static float _gatherItemLocationColumWidth = 0;
         private static float _cheapestColumnWidth = 100;
         private static float _numberForSaleWidth = 100;
-        
+
         private static float FixedWidth(float baseWidth, string label)
         {
             if (baseWidth <= 0)
@@ -87,7 +87,7 @@ namespace Artisan.UI.Tables
         private bool? isOnList = null;
 
         public IngredientTable(List<Ingredient> ingredientList)
-            : base("IngredientTableV2", ingredientList) 
+            : base("IngredientTableV2", ingredientList)
         {
             if (P.Config.DefaultHideInventoryColumn) _inventoryColumn.Flags |= ImGuiTableColumnFlags.DefaultHide;
             if (P.Config.DefaultHideRetainerColumn) _retainerColumn.Flags |= ImGuiTableColumnFlags.DefaultHide;
@@ -120,7 +120,7 @@ namespace Artisan.UI.Tables
                 item.OnRemainingChange += SetFilterDirty;
             }
         }
-        
+
         private bool subcraftCountsDirty = false;
 
         private void SetFilterDirty(object? sender, bool e)
@@ -195,7 +195,7 @@ namespace Artisan.UI.Tables
                 }
 
                 if (item.Icon is not null)
-                ImGuiUtil.HoverIcon(item.Icon, Interface.LineIconSize);
+                    ImGuiUtil.HoverIcon(item.Icon, Interface.LineIconSize);
                 ImGui.SameLine();
 
                 var selected = ImGui.Selectable($"{item.Data.Name.ToString()}");
@@ -460,10 +460,7 @@ namespace Artisan.UI.Tables
                     if (ImGui.Button($"Fetch Prices"))
                     {
                         P.UniversalsisClient.PlayerWorld = Svc.Objects.LocalPlayer?.CurrentWorld.RowId;
-                        if (P.Config.LimitUnversalisToDC)
-                            Task.Run(() => P.UniversalsisClient.GetDCData(item.Data.RowId, ref item.MarketboardData));
-                        else
-                            Task.Run(() => P.UniversalsisClient.GetRegionData(item.Data.RowId, ref item.MarketboardData));
+                        Task.Run(() => P.UniversalsisClient.GetRegionData(item.Data.RowId, ref item.MarketboardData));
                     }
                 }
             }
@@ -735,7 +732,9 @@ namespace Artisan.UI.Tables
             if (!popup)
                 return;
 
+            DrawGatherChill(item);
             DrawGatherItem(item);
+            DrawFeesh(item);
             DrawSearchItem(item);
             DrawItemVendorLookup(item);
             DrawMonsterLootLookup(item);
@@ -917,14 +916,75 @@ namespace Artisan.UI.Tables
 
         }
 
-        private static void DrawGatherItem(Ingredient item)
+        private static void DrawGatherChill(Ingredient item)
         {
             if (item.Data.RowId == 0 || item.Sources.Contains(1))
                 return;
 
+            if (Feesh.IsFish(item.Data.RowId) || !GatherChill.IsEnabled() || !GatherChill.CanGather(item.Data.RowId))
+                return;
+
+            var amount = Math.Max(1, item.Remaining);
+
+            if (GatherChill.IsBusy())
+            {
+                if (ImGui.Selectable("Stop Gather & Chill"))
+                {
+                    try
+                    {
+                        GatherChill.Stop();
+                    }
+                    catch (Exception e)
+                    {
+                        e.Log();
+                    }
+                }
+            }
+            else if (ImGui.Selectable("Gather with Gather & Chill"))
+            {
+                try
+                {
+                    if (GatherChill.GatherItem(item.Data.RowId, amount))
+                    {
+                        Notify.Success($"Gathering {amount}x {item.Data.Name} with Gather & Chill.");
+                        GatherChill.OpenOverlay();
+                    }
+                    else
+                        Notify.Error($"Gather & Chill could not start gathering {item.Data.Name}.");
+                }
+                catch (Exception e)
+                {
+                    e.Log();
+                }
+            }
+
+            if (!ImGui.Selectable("Add to Gather & Chill List"))
+                return;
+
+            try
+            {
+                if (GatherChill.AddToGatherList([(item.Data.RowId, amount)]) > 0)
+                {
+                    Notify.Success($"Added {amount}x {item.Data.Name} to Gather & Chill.");
+                    GatherChill.OpenWindow();
+                }
+                else
+                    Notify.Error($"Gather & Chill could not add {item.Data.Name}.");
+            }
+            catch (Exception e)
+            {
+                e.Log();
+            }
+        }
+
+        private static void DrawGatherItem(Ingredient item)
+        {
+            if (item.Data.RowId == 0 || !(item.Sources.Contains(2) || item.Sources.Contains(3)))
+                return;
+
             if (GatherBuddy)
             {
-                if (!ImGui.Selectable("Gather Item"))
+                if (!ImGui.Selectable("Gather with Gatherbuddy"))
                     return;
 
                 try
@@ -941,7 +1001,51 @@ namespace Artisan.UI.Tables
             }
             else
             {
-                ImGui.TextDisabled("Gather Item (Please install Gatherbuddy)");
+                ImGui.TextDisabled("Gather with Gatherbuddy (Please install Gatherbuddy)");
+            }
+        }
+
+        private static void DrawFeesh(Ingredient item)
+        {
+            if (item.Data.RowId == 0 || item.Sources.Contains(1))
+                return;
+
+            if (!Feesh.CanFish(item.Data.RowId))
+                return;
+
+            if (Feesh.IsBusy())
+            {
+                if (!ImGui.Selectable("Stop Feesh"))
+                    return;
+
+                try
+                {
+                    if (!Feesh.CancelCatch())
+                        Feesh.Stop();
+                }
+                catch (Exception e)
+                {
+                    e.Log();
+                }
+
+                return;
+            }
+
+            if (!ImGui.Selectable("Catch with Feesh"))
+                return;
+
+            var amount = Math.Max(1, item.Remaining);
+
+            try
+            {
+                if (Feesh.Catch(item.Data.RowId, amount))
+                    Notify.Success($"Catching {amount}x {item.Data.Name} with Feesh.");
+                else
+                    Notify.Error($"Feesh could not start catching {item.Data.Name}. Its log says why.");
+            }
+            catch (Exception e)
+            {
+                e.Log();
             }
         }
     }
