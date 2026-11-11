@@ -106,6 +106,7 @@ public unsafe class Artisan : IDalamudPlugin
         ConsumableChecker.Init();
         Endurance.Init();
         IPC.IPC.Init();
+        Feesh.Init();
         RetainerInfo.Init();
         IngredientMarketboardSearch.Init();
         CraftingListContextMenu.Init();
@@ -281,6 +282,7 @@ public unsafe class Artisan : IDalamudPlugin
         IngredientMarketboardSearch.Dispose();
         RetainerInfo.Dispose();
         IPC.IPC.Dispose();
+        Feesh.Dispose();
 
         ECommonsMain.Dispose();
         NCA?.Dispose();

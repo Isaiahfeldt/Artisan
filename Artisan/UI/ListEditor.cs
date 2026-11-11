@@ -1040,6 +1040,58 @@ internal class ListEditor : Window, IDisposable
 
         }
 
+        if (GatherChill.IsEnabled())
+        {
+            ImGui.SameLine();
+            if (ImGui.Button("Send Remaining to Gather & Chill"))
+            {
+                var items = Table.ListItems
+                    .Where(x => x.Remaining > 0 && !x.Sources.Contains(1) && !Feesh.IsFish(x.Data.RowId) && GatherChill.CanGather(x.Data.RowId))
+                    .Select(x => (x.Data.RowId, x.Remaining))
+                    .ToArray();
+
+                if (items.Length > 0)
+                {
+                    var added = GatherChill.OverwriteGatherList(items);
+                    Notify.Success($"Sent {added} items to Gather & Chill.");
+                    if (added > 0)
+                        GatherChill.OpenWindow();
+                }
+                else
+                {
+                    Notify.Error($"No remaining items that Gather & Chill can gather.");
+                }
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGuiEx.Tooltip($"Replaces Gather & Chill's gather list with all remaining gatherable ingredients.");
+            }
+        }
+
+        if (Feesh.IsEnabled())
+        {
+            ImGui.SameLine();
+            if (ImGui.Button("Send Remaining to Feesh"))
+            {
+                var items = Table.ListItems
+                    .Where(x => x.Remaining > 0 && !x.Sources.Contains(1) && Feesh.CanFish(x.Data.RowId))
+                    .Select(x => (x.Data.RowId, x.Remaining))
+                    .ToArray();
+
+                if (items.Length == 0)
+                    Notify.Error($"No remaining fish that Feesh can catch.");
+                else if (Feesh.CatchList(items))
+                    Notify.Success($"Feesh is catching {items.Length} fish.");
+                else
+                    Notify.Error($"Feesh could not start catching. Its log says why.");
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGuiEx.Tooltip($"Has Feesh catch all remaining fish. They are kept safe from Feesh's bag cleaning until this list is finished or deleted.");
+            }
+        }
 
         ImGui.SameLine();
         if (ImGui.Button("Need Help?"))
@@ -1096,7 +1148,7 @@ internal class ListEditor : Window, IDisposable
         ImGui.BulletText($"Right clicking on an ingredient name opens a context menu with further options.");
         ImGui.BulletText($"Clicking and dragging on the space on the headers between columns (as shown by it lighting up) allows you to re-order the columns.");
         ImGui.BulletText($"Don't see any items? Check the table headers for a red heading. This indicates this column is being filtered on. Right clicking the header will clear the filter.");
-        ImGui.BulletText($"You can extend the functionality of the table by installing the following plugins:\n- Allagan Tools (Enables all retainer features)\n- Item Vendor Lookup\n- Gatherbuddy\n- Monster Loot Hunter");
+        ImGui.BulletText($"You can extend the functionality of the table by installing the following plugins:\n- Allagan Tools (Enables all retainer features)\n- Item Vendor Lookup\n- Gatherbuddy\n- Gather & Chill (Gather items or add them to its gather list)\n- WahTools (Catch fish with Feesh)\n- Monster Loot Hunter");
         ImGui.BulletText($"Tip: Filter on \"Remaining Needed\" and \"Sources\" when gathering to help filter on items missing, along with sorting by gathered zone\nto help reduce travel times.");
 
         ImGui.SetCursorPosY(windowSize.Y - ImGui.GetFrameHeight() - ImGui.GetStyle().WindowPadding.Y);
@@ -1670,6 +1722,8 @@ internal class ListFolders : ItemSelector<NewCraftingList>
 
         P.Config.NewCraftingLists.RemoveAt(idx);
         P.Config.Save();
+
+        Feesh.ReleaseAll();
 
         if (!CraftingListUI.Processing)
             CraftingListUI.selectedList = new NewCraftingList();
