@@ -46,6 +46,7 @@ public unsafe class Artisan : IDalamudPlugin
     internal TextureCache Icons;
     internal UniversalisClient UniversalsisClient;
     internal NativeCraftAll? NCA;
+    internal NativeListButtons? NLB;
     internal PremadeLists PremadeLists;
     internal AutoRetainerApi? AutoRetainerAPI;
     internal AutoRetainerIPC? AutoRetainerIPC;
@@ -57,7 +58,7 @@ public unsafe class Artisan : IDalamudPlugin
     {
         ECommonsMain.Init(pluginInterface, this, Module.DalamudReflector);
         PunishLibMain.Init(pluginInterface, "Artisan", new AboutPlugin() { Sponsor = "https://ko-fi.com/taurenkey" });
-        KamiToolKitLibrary.Initialize(pluginInterface);
+        KamiToolKitLibrary.InitializeAsync(pluginInterface);
         P = this;
 
         LuminaSheets.Init();
@@ -127,7 +128,7 @@ public unsafe class Artisan : IDalamudPlugin
         Svc.Condition.ConditionChange += Condition_ConditionChange;
 
         PluginUi.OpenWindow = OpenWindow.Main;  
-        Svc.Framework.RunOnFrameworkThread(() => NCA = new());
+        Svc.Framework.RunOnFrameworkThread(() => { NCA = new(); NLB = new(); });
         ConvertCraftingLists();
     }
 
@@ -137,6 +138,9 @@ public unsafe class Artisan : IDalamudPlugin
         CraftingListUI.Processing = false;
         RaphaelCache.CurrentCache = [];
         P.PluginUi.RaphaelCacheUI.Table = null;
+        Crafting.CurState = Crafting.State.InvalidState;
+
+        Svc.Log.Debug($"Cleared out states due to logging in/out. Type: {type}, Code: {code}");
     }
 
     private void ConvertCraftingLists()
@@ -285,7 +289,8 @@ public unsafe class Artisan : IDalamudPlugin
         Feesh.Dispose();
 
         ECommonsMain.Dispose();
-        NCA?.Dispose();
+        NCA?.Dispose(true);
+        NLB?.Dispose();
         KamiToolKitLibrary.Dispose();
         P = null!;
     }
