@@ -11,5 +11,5 @@
   ],
   "RepoUrl": "https://github.com/Isaiahfeldt/Artisan",
   "DalamudApiLevel": 15,
-  "ChangeLog": "Merge upstream restocking and native crafting UI/scaling improvements. Preserve the Ctrl-click/context-menu marketboard open-and-fill shortcut with manual submission."
+  "ChangeLog": "Open a saved crafting list directly with /artisan <list name>. Supports spaces, case-insensitive names, and bringing an existing editor forward. Marketboard search submission remains manual."
 }

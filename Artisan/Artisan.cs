@@ -83,6 +83,7 @@ public unsafe class Artisan : IDalamudPlugin
         Svc.Commands.AddHandler(commandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Opens the Artisan menu.\n" +
+            "/artisan <list name> → Opens a saved list by name (quote names that overlap commands).\n" +
             "/artisan lists → Open Lists.\n" +
             "/artisan lists <ID> → Opens specific list by ID.\n" +
             "/artisan lists <ID> start → Starts specific list by ID.\n" +
@@ -297,6 +298,43 @@ public unsafe class Artisan : IDalamudPlugin
 
     private void OnCommand(string command, string args)
     {
+        var listName = ListNameCommand.GetListName(args);
+        if (listName != null)
+        {
+            var matches = P.Config.NewCraftingLists
+                .Where(x => ListNameCommand.Matches(x.Name, listName)).ToArray();
+            if (matches.Length == 0)
+            {
+                DuoLog.Error($"No crafting list named '{listName}' was found.");
+                return;
+            }
+            if (matches.Length > 1)
+            {
+                DuoLog.Error($"Multiple crafting lists are named '{listName}'. Use /artisan lists <ID>: {string.Join(", ", matches.Select(x => x.ID))}.");
+                return;
+            }
+            if (CraftingListUI.Processing)
+            {
+                DuoLog.Error("Unable to open list whilst processing.");
+                return;
+            }
+
+            var list = matches[0];
+            var existing = P.ws.Windows.OfType<ListEditor>().FirstOrDefault(x => x.SelectedList.ID == list.ID);
+            if (existing != null)
+            {
+                existing.IsOpen = true;
+                existing.Minimized = false;
+                existing.BringToFront();
+            }
+            else
+            {
+                UI.Tables.Interface.SetupValues();
+                _ = new ListEditor(list);
+            }
+            return;
+        }
+
         var subcommands = args.Split(' ');
 
         if (subcommands.Length == 0)
