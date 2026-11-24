@@ -13,6 +13,12 @@ Repo Url:
 `https://love.puni.sh/ment.json`
 </div>
 
+## Open a crafting list by name
+
+Use `/artisan retainer-main` to open that saved crafting list directly, without opening the main Artisan window or starting crafting. Names match in full, ignoring capitalization. Spaces are supported: `/artisan Retainer Main` or `/artisan "Retainer Main"`.
+
+Existing commands keep priority. Quote a list name that overlaps a command, for example `/artisan "settings"`. Repeating the command brings the existing list editor forward. Missing names produce an error; duplicate names show the matching IDs so you can use `/artisan lists <ID>`. As with the existing ID command, opening is blocked while a crafting list is processing.
+
 ## Ingredient marketboard shortcut
 
 Version **4.0.5.26** removes the toggle. **Ctrl+left-click** an ingredient name, or right-click it and choose **Search in game marketboard**, to open a nearby marketboard (or use an already-open one) and fill the ingredient name. **Press Enter or click Search yourself.** There is no automatic keypress, custom Search-button event dispatch, or direct search-state write.

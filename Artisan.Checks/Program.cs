@@ -85,4 +85,22 @@ Check("Plain and Alt-modified clicks retain copying", () =>
     True(IngredientClick.Resolve(false, false, false) == IngredientClickAction.CopyName);
     True(IngredientClick.Resolve(true, false, true) == IngredientClickAction.CopyName);
 });
-Console.WriteLine($"{passed} marketboard-fill and shortcut checks passed.");
+Check("List command accepts hyphens and full names with spaces", () =>
+{
+    True(ListNameCommand.GetListName("retainer-main") == "retainer-main");
+    True(ListNameCommand.GetListName("  Retainer Main  ") == "Retainer Main");
+    True(ListNameCommand.GetListName("\"Retainer Main\"") == "Retainer Main");
+});
+Check("Existing Artisan commands keep precedence", () =>
+{
+    foreach (var args in new[] { "", "  ", "lists", "lists 123 start", "MACROS 12", "endurance start", "settings", "automode", "builder", "workshop", "workshops", "sim" })
+        True(ListNameCommand.GetListName(args) == null);
+    True(ListNameCommand.GetListName("\"lists\"") == "lists");
+});
+Check("List names match exactly ignoring case and detect ambiguity", () =>
+{
+    var names = new[] { "Retainer-Main", "retainer-main", "retainer-main-extra" };
+    True(names.Count(x => ListNameCommand.Matches(x, "RETAINER-MAIN")) == 2);
+    True(!ListNameCommand.Matches("retainer-main", "retainer"));
+});
+Console.WriteLine($"{passed} checks passed.");
